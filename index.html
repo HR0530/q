@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>縦スクロールシューティング</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: #000;
+            height: 100%;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            border: 2px solid #fff;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = 360;
+canvas.height = 640;
+
+const player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 60,
+            width: 50,
+            height: 50,
+};
+
+let isGameStarted = false;
+let isGameOver = false;
+let score = 0;
+let lives = 3;
+let bullets = [];
+let enemies = [];
+let recoveryItems = [];
+let playerSpeed = 6;
+let backgroundOffset = 0;
+let lastSpeedUpTime = Date.now();
+let lastEnemySpawnTime = 0;
+let enemySpawnInterval = 1000;
+let speedUpInterval = 30000;
+
+function drawRect(obj, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+}
+
+function drawText(text, x, y, size = 20, color = 'white', align = 'center') {
+            ctx.font = `${size}px "メイリオ", "游ゴシック", sans-serif`;
+            ctx.fillStyle = color;
+            ctx.textAlign = align;
+            ctx.fillText(text, x, y);
+}
+
+function spawnEnemy() {
+            if (Date.now() - lastEnemySpawnTime < enemySpawnInterval) return;
+            lastEnemySpawnTime = Date.now();
+            let w = 40, h = 40;
+            let dx = Math.random() > 0.5 ? 1.5 : -1.5;
+            enemies.push({
+                x: Math.random() * (canvas.width - w),
+                y: -h,
+                width: w,
+                height: h,
+                dx: dx
+            });
+}
+
+function spawnRecoveryItem() {
+            if (Math.random() < 0.01) {
+                recoveryItems.push({
+                    x: Math.random() * (canvas.width - 20),
+                    y: 0,
+                    width: 20,
+                    height: 20,
+                    speed: 2,
+                });
+            }
+}
+
+function updateRecoveryItems() {
+            for (let item of recoveryItems) {
+                item.y += item.speed;
+            }
+            recoveryItems = recoveryItems.filter(item => item.y < canvas.height);
+}
+
+function checkRecoveryItemCollision() {
+            for (let i = recoveryItems.length - 1; i >= 0; i--) {
+                const item = recoveryItems[i];
+                if (player.x < item.x + item.width &&
+                    player.x + player.width > item.x &&
+                    player.y < item.y + item.height &&
+                    player.y + player.height > item.y) {
+                    if (lives < 3) lives += 1;
+                    recoveryItems.splice(i, 1);
+                }
+            }
+}
+
+function resetGame() {
+            isGameOver = false;
+            score = 0;
+            lives = 3;
+            bullets = [];
+            enemies = [];
+            recoveryItems = [];
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - 60;
+            lastSpeedUpTime = Date.now();
+}
+
+function resetPlayerPosition() {
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - 60;
+}
+
+function drawHearts() {
+            const heart = "♡";
+            let hearts = heart.repeat(lives);
+            drawText(hearts, canvas.width - 10, canvas.height - 10, 24, "pink", "right");
+}
+
+function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (!isGameStarted) {
+                drawText("縦スクロールシューティング", canvas.width / 2, 260, 20);
+                drawText("タップかスペースキーで開始", canvas.width / 2, 300, 16, 'gray');
+                return;
+            }
+
+            if (isGameOver) {
+                drawText("GAME OVER", canvas.width / 2, 300, 32, 'red');
+                drawText(`スコア: ${score}`, canvas.width / 2, 350);
+                drawText("タップかスペースキーで再開", canvas.width / 2, 400, 16, 'gray');
+                return;
+            }
+
+            if (Date.now() - lastSpeedUpTime > speedUpInterval) {
+                lastSpeedUpTime = Date.now();
+                playerSpeed += 1;
+            }
+
+            backgroundOffset += 2;
+            ctx.strokeStyle = '#333';
+            for (let i = 0; i < canvas.height / 40; i++) {
+                let y = (i * 40 + backgroundOffset) % canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            spawnEnemy();
+            spawnRecoveryItem();
+            updateRecoveryItems();
+            checkRecoveryItemCollision();
+
+            bullets.forEach(b => b.y -= 5);
+            bullets = bullets.filter(b => b.y > 0);
+
+            enemies.forEach(e => {
+                e.y += 2;
+                e.x += e.dx;
+                if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
+            });
+            enemies = enemies.filter(e => e.y < canvas.height);
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const b = bullets[j];
+                    if (b.x < e.x + e.width &&
+                        b.x + b.width > e.x &&
+                        b.y < e.y + e.height &&
+                        b.y + b.height > e.y) {
+                        enemies.splice(i, 1);
+                        bullets.splice(j, 1);
+                        score += 100;
+                        break;
+                    }
+                }
+            }
+
+            for (let e of enemies) {
+                if (player.x < e.x + e.width &&
+                    player.x + player.width > e.x &&
+                    player.y < e.y + e.height &&
+                    player.y + player.height > e.y) {
+                    lives -= 1;
+                    if (lives <= 0) {
+                        isGameOver = true;
+                    } else {
+                        resetPlayerPosition();
+                    }
+                }
+            }
+
+            drawRect(player, 'white');
+            bullets.forEach(b => drawRect(b, 'cyan'));
+            enemies.forEach(e => drawRect(e, 'red'));
+            recoveryItems.forEach(item => drawRect(item, 'green'));
+            drawText(`スコア: ${score}`, canvas.width - 10, 25, 16, 'white', 'right');
+            drawHearts();
+}
+
+document.addEventListener('keydown', e => {
+            if (e.key === ' ') {
+                if (!isGameStarted || isGameOver) {
+                    resetGame();
+                    isGameStarted = true;
+                } else {
+                    bullets.push({
+                        x: player.x + player.width / 2 - 2,
+                        y: player.y,
+                        width: 4,
+                        height: 10
+                    });
+                }
+            }
+            if (isGameStarted && !isGameOver) {
+                if (e.key === 'ArrowLeft') player.x -= playerSpeed;
+                if (e.key === 'ArrowRight') player.x += playerSpeed;
+            }
+});
+
+canvas.addEventListener('click', () => {
+            if (!isGameStarted || isGameOver) {
+                resetGame();
+                isGameStarted = true;
+            } else {
+                bullets.push({
+                    x: player.x + player.width / 2 - 2,
+                    y: player.y,
+                    width: 4,
+                    height: 10
+                });
+            }
+});
+
+function gameLoop() {
+            update();
+            requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+    </script>
+</body>
+</html>
