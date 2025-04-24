@@ -5,182 +5,214 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>縦スクロールシューティングゲーム</title>
     <style>
-        html, body {
+        body {
             margin: 0;
             padding: 0;
             background-color: #000;
-            height: 100%;
-            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
             overflow: hidden;
         }
         canvas {
-            display: block;
-            margin: 0 auto;
-            background-color: #000;
             border: 2px solid #fff;
-            touch-action: none;
+            max-width: 100%;
+            max-height: 100vh;
+            display: block;
+        }
+        .controls {
+            position: fixed;
+            bottom: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            z-index: 10;
+        }
+        .button {
+            background-color: #444;
+            color: white;
+            border: 2px solid #fff;
+            padding: 15px 25px;
+            font-size: 18px;
+            border-radius: 10px;
+            user-select: none;
         }
     </style>
 </head>
 <body>
-    <canvas id="gameCanvas" width="360" height="640"></canvas>
+    <canvas id="gameCanvas"></canvas>
+    <div class="controls">
+        <div class="button" id="leftBtn">←</div>
+        <div class="button" id="shootBtn">発射</div>
+        <div class="button" id="rightBtn">→</div>
+    </div>
     <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
 
-    const player = {
-        x: canvas.width / 2 - 25,
-        y: canvas.height - 60,
-        width: 50,
-        height: 50,
-        speed: 6
-    };
+        canvas.width = 400;
+        canvas.height = 600;
 
-    let isGameStarted = false;
-    let isGameOver = false;
-    let score = 0;
-    let lives = 3;
-    let enemies = [];
-    let bullets = [];
-    let recoveryItems = [];
-    let lastSpeedUpTime = Date.now();
-    let playerSpeed = 6;
+        const player = {
+            x: canvas.width / 2 - 25,
+            y: canvas.height - 60,
+            width: 50,
+            height: 50
+        };
 
-    function drawRect(obj, color) {
-        ctx.fillStyle = color;
-        ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
-    }
+        let isGameStarted = false;
+        let isGameOver = false;
+        let score = 0;
+        let lives = 3;
+        let enemies = [];
+        let bullets = [];
+        let recoveryItems = [];
+        let backgroundOffset = 0;
+        let playerSpeed = 5;
+        let speedUpInterval = 30000;
+        let speedIncrease = 1;
+        let lastSpeedUpTime = Date.now();
 
-    function drawText(text, x, y, size = 20, color = 'white', align = 'left') {
-        ctx.font = `${size}px sans-serif`;
-        ctx.fillStyle = color;
-        ctx.textAlign = align;
-        ctx.fillText(text, x, y);
-    }
-
-    function spawnEnemy() {
-        if (Math.random() < 0.02) {
-            const enemyWidth = 40;
-            const enemyHeight = 40;
-            enemies.push({
-                x: Math.random() * (canvas.width - enemyWidth),
-                y: -enemyHeight,
-                width: enemyWidth,
-                height: enemyHeight,
-                dx: Math.random() > 0.5 ? 2 : -2
-            });
+        function drawRect(obj, color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
         }
-    }
 
-    function spawnRecoveryItem() {
-        if (Math.random() < 0.01) {
-            recoveryItems.push({
-                x: Math.random() * (canvas.width - 20),
-                y: 0,
-                width: 20,
-                height: 20,
-                speed: 2
-            });
+        function drawText(text, x, y, size = 20, color = 'white', align = 'left') {
+            ctx.font = `${size}px Arial`;
+            ctx.fillStyle = color;
+            ctx.textAlign = align;
+            ctx.fillText(text, x, y);
         }
-    }
 
-    function updateRecoveryItems() {
-        for (let item of recoveryItems) {
-            item.y += item.speed;
-        }
-        recoveryItems = recoveryItems.filter(item => item.y < canvas.height);
-    }
-
-    function checkRecoveryItemCollision() {
-        for (let i = recoveryItems.length - 1; i >= 0; i--) {
-            const item = recoveryItems[i];
-            if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
-                if (lives < 3) lives++;
-                recoveryItems.splice(i, 1);
+        function spawnEnemy() {
+            if (Math.random() < 0.02) {
+                enemies.push({
+                    x: Math.random() * (canvas.width - 40),
+                    y: -40,
+                    width: 40,
+                    height: 40,
+                    dx: Math.random() > 0.5 ? 2 : -2
+                });
             }
         }
-    }
 
-    function update() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        if (!isGameStarted) {
-            drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, 'white', 'center');
-            drawText("タップでスタート", canvas.width / 2, 300, 18, 'gray', 'center');
-            return;
+        function spawnRecoveryItem() {
+            if (Math.random() < 0.01) {
+                recoveryItems.push({
+                    x: Math.random() * canvas.width,
+                    y: 0,
+                    width: 20,
+                    height: 20,
+                    speed: 2
+                });
+            }
         }
 
-        if (isGameOver) {
-            drawText("GAME OVER", canvas.width / 2, 280, 40, 'red', 'center');
-            drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, 'white', 'center');
-            drawText("タップでリトライ", canvas.width / 2, 380, 18, 'gray', 'center');
-            return;
-        }
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (Date.now() - lastSpeedUpTime > 30000) {
-            lastSpeedUpTime = Date.now();
-            playerSpeed += 1;
-        }
+            if (!isGameStarted) {
+                drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, 'white', 'center');
+                drawText("画面タップまたはスペースキーでスタート", canvas.width / 2, 300, 16, 'gray', 'center');
+                return;
+            }
 
-        bullets.forEach(b => b.y -= 5);
-        bullets = bullets.filter(b => b.y > 0);
+            if (isGameOver) {
+                drawText("GAME OVER", canvas.width / 2, 280, 40, 'red', 'center');
+                drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, 'white', 'center');
+                drawText("スペースキーでリトライ", canvas.width / 2, 380, 18, 'gray', 'center');
+                return;
+            }
 
-        enemies.forEach(e => {
-            e.y += 2;
-            e.x += e.dx;
-            if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
-        });
-        enemies = enemies.filter(e => e.y < canvas.height);
+            if (Date.now() - lastSpeedUpTime > speedUpInterval) {
+                lastSpeedUpTime = Date.now();
+                playerSpeed += speedIncrease;
+            }
 
-        for (let i = enemies.length - 1; i >= 0; i--) {
-            const e = enemies[i];
-            for (let j = bullets.length - 1; j >= 0; j--) {
-                const b = bullets[j];
-                if (b.x < e.x + e.width && b.x + b.width > e.x && b.y < e.y + e.height && b.y + b.height > e.y) {
-                    enemies.splice(i, 1);
-                    bullets.splice(j, 1);
-                    score += 100;
-                    break;
+            spawnEnemy();
+            spawnRecoveryItem();
+
+            bullets.forEach(b => b.y -= 5);
+            bullets = bullets.filter(b => b.y > 0);
+
+            enemies.forEach(e => {
+                e.y += 2;
+                e.x += e.dx;
+                if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
+            });
+            enemies = enemies.filter(e => e.y < canvas.height);
+
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    const b = bullets[j];
+                    if (b.x < e.x + e.width && b.x + b.width > e.x && b.y < e.y + e.height && b.y + b.height > e.y) {
+                        enemies.splice(i, 1);
+                        bullets.splice(j, 1);
+                        score += 100;
+                        break;
+                    }
                 }
             }
+
+            for (let e of enemies) {
+                if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
+                    lives -= 1;
+                    if (lives <= 0) isGameOver = true;
+                }
+            }
+
+            for (let i = recoveryItems.length - 1; i >= 0; i--) {
+                const item = recoveryItems[i];
+                item.y += item.speed;
+                if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
+                    if (lives < 3) lives++;
+                    recoveryItems.splice(i, 1);
+                }
+            }
+
+            ctx.strokeStyle = '#333';
+            for (let i = 0; i < canvas.height / 40; i++) {
+                let y = (i * 40 + backgroundOffset) % canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+
+            drawRect(player, 'white');
+            bullets.forEach(b => drawRect(b, 'cyan'));
+            enemies.forEach(e => drawRect(e, 'red'));
+            recoveryItems.forEach(item => drawRect(item, 'green'));
+
+            drawText(`SCORE: ${score}`, 10, 30);
+            drawText(`♥`.repeat(lives), canvas.width - 60, 30, 24, 'pink', 'left');
         }
 
-        for (let e of enemies) {
-            if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
-                lives--;
-                if (lives <= 0) {
-                    isGameOver = true;
+        document.addEventListener('keydown', e => {
+            if (e.key === ' ') {
+                if (!isGameStarted || isGameOver) {
+                    isGameStarted = true;
+                    isGameOver = false;
+                    score = 0;
+                    lives = 3;
+                    enemies = [];
+                    bullets = [];
                 } else {
-                    player.x = canvas.width / 2 - 25;
-                    player.y = canvas.height - 60;
+                    shoot();
                 }
             }
-        }
+            if (isGameStarted && !isGameOver) {
+                if (e.key === 'ArrowLeft') player.x -= playerSpeed;
+                if (e.key === 'ArrowRight') player.x += playerSpeed;
+            }
+        });
 
-        spawnEnemy();
-        spawnRecoveryItem();
-        updateRecoveryItems();
-        checkRecoveryItemCollision();
-
-        drawRect(player, 'white');
-        bullets.forEach(b => drawRect(b, 'cyan'));
-        enemies.forEach(e => drawRect(e, 'red'));
-        recoveryItems.forEach(item => drawRect(item, 'green'));
-        drawText(`SCORE: ${score}`, 10, 30);
-        drawText(`♥`.repeat(lives), canvas.width - 60, 30, 24, 'pink', 'left');
-    }
-
-    canvas.addEventListener('touchstart', (e) => {
-        const touch = e.touches[0];
-        if (!isGameStarted || isGameOver) {
-            isGameStarted = true;
-            isGameOver = false;
-            score = 0;
-            lives = 3;
-            enemies = [];
-            bullets = [];
-            recoveryItems = [];
-        } else {
+        function shoot() {
             bullets.push({
                 x: player.x + player.width / 2 - 2,
                 y: player.y,
@@ -188,21 +220,11 @@
                 height: 10
             });
         }
-    });
 
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touch = e.touches[0];
-        const rect = canvas.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        player.x = x - player.width / 2;
-
-        if (player.x < 0) player.x = 0;
-        if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-    }, { passive: false });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === ' ') {
+        document.getElementById('leftBtn').addEventListener('touchstart', () => player.x -= playerSpeed);
+        document.getElementById('rightBtn').addEventListener('touchstart', () => player.x += playerSpeed);
+        document.getElementById('shootBtn').addEventListener('touchstart', shoot);
+        canvas.addEventListener('touchstart', () => {
             if (!isGameStarted || isGameOver) {
                 isGameStarted = true;
                 isGameOver = false;
@@ -210,28 +232,14 @@
                 lives = 3;
                 enemies = [];
                 bullets = [];
-                recoveryItems = [];
-            } else {
-                bullets.push({
-                    x: player.x + player.width / 2 - 2,
-                    y: player.y,
-                    width: 4,
-                    height: 10
-                });
             }
-        }
-        if (isGameStarted && !isGameOver) {
-            if (e.key === 'ArrowLeft') player.x -= playerSpeed;
-            if (e.key === 'ArrowRight') player.x += playerSpeed;
-        }
-    });
+        });
 
-    function gameLoop() {
-        update();
-        requestAnimationFrame(gameLoop);
-    }
-
-    gameLoop();
+        function gameLoop() {
+            update();
+            requestAnimationFrame(gameLoop);
+        }
+        gameLoop();
     </script>
 </body>
 </html>
