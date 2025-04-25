@@ -1,25 +1,27 @@
-html, body {
+body {
   margin: 0;
   padding: 0;
-  background-color: #000;
-  height: 100%;
-  overflow: hidden;
-  touch-action: none;
-}
-
-canvas {
-  display: block;
-  border: 2px solid #fff;
-  width: 100vw;
+  background-color: black;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   height: 100vh;
+  overflow: hidden;
 }
 
-.gameover-img {
+#gameCanvas {
+  width: 400px;
+  height: 600px;
+  background-color: #111;
+  border: 2px solid white;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+#gameoverImage {
   position: absolute;
+  width: 300px;
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 80%;
   display: none;
-  z-index: 10;
 }
