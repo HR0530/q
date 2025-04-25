@@ -12,11 +12,13 @@ let enemies = [];
 let bullets = [];
 let recoveryItems = [];
 let playerSpeed = 5;
+let speedUpInterval = 30000;
+let lastSpeedUpTime = Date.now();
 let backgroundOffset = 0;
 let invincibleTimer = 0;
-let lastShootTime = 0;
-let startX = null;
-let enemySpeed = 2;
+
+let touchStartX = null;
+const gameOverImage = document.getElementById('gameOverImage');
 
 function drawRect(obj, color) {
   ctx.fillStyle = color;
@@ -49,7 +51,7 @@ function spawnEnemy() {
 }
 
 function spawnRecoveryItem() {
-  if (Math.random() < 0.01) {
+  if (Math.random() < 0.002) { // 出現率を下げた
     recoveryItems.push({
       x: Math.random() * (canvas.width - 20),
       y: -20,
@@ -69,37 +71,29 @@ function shoot() {
   });
 }
 
-function autoShoot() {
-  if (Date.now() - lastShootTime > 500) {
-    shoot();
-    lastShootTime = Date.now();
-  }
-}
-
-function updateEnemySpeed() {
-  enemySpeed = 2 + Math.floor(score / 2000);
-}
-
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!isGameStarted) {
     drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, 'white', 'center');
-    drawText("画面タップでスタート", canvas.width / 2, 300, 16, 'gray', 'center');
+    drawText("タップまたはスペースキーでスタート", canvas.width / 2, 300, 16, 'gray', 'center');
     return;
   }
 
   if (isGameOver) {
+    gameOverImage.style.display = 'block';
     drawText("GAME OVER", canvas.width / 2, 280, 40, 'red', 'center');
     drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, 'white', 'center');
-    drawText("画面タップでリトライ", canvas.width / 2, 380, 18, 'gray', 'center');
+    drawText("スペースキーでリトライ", canvas.width / 2, 380, 18, 'gray', 'center');
     return;
   }
 
-  updateEnemySpeed();
-  autoShoot();
+  if (Date.now() - lastSpeedUpTime > speedUpInterval) {
+    lastSpeedUpTime = Date.now();
+    playerSpeed += 1;
+  }
 
-  // 背景スクロール線
+  // 背景スクロール
   ctx.strokeStyle = '#333';
   for (let i = 0; i < canvas.height / 40; i++) {
     let y = (i * 40 + backgroundOffset) % canvas.height;
@@ -115,12 +109,13 @@ function update() {
 
   spawnEnemy();
   enemies.forEach(e => {
-    e.y += enemySpeed;
+    e.y += 2;
     e.x += e.dx;
     if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
   });
   enemies = enemies.filter(e => e.y < canvas.height);
 
+  // 弾と敵の当たり判定
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     for (let j = bullets.length - 1; j >= 0; j--) {
@@ -134,6 +129,7 @@ function update() {
     }
   }
 
+  // 敵とプレイヤーの衝突（1回だけダメージ）
   if (invincibleTimer <= 0) {
     for (let e of enemies) {
       if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
@@ -147,6 +143,7 @@ function update() {
     invincibleTimer--;
   }
 
+  // 回復アイテム処理
   spawnRecoveryItem();
   for (let i = recoveryItems.length - 1; i >= 0; i--) {
     const item = recoveryItems[i];
@@ -162,6 +159,7 @@ function update() {
     }
   }
 
+  // 描画
   drawRect(player, 'white');
   bullets.forEach(b => drawRect(b, 'cyan'));
   enemies.forEach(e => drawRect(e, 'red'));
@@ -170,33 +168,47 @@ function update() {
   drawLives();
 }
 
-// タッチでスライド移動
-canvas.addEventListener('touchstart', (e) => {
+// スワイプによる移動
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
   if (!isGameStarted || isGameOver) {
     isGameStarted = true;
     isGameOver = false;
+    gameOverImage.style.display = 'none';
     score = 0;
     lives = 3;
     enemies = [];
     bullets = [];
     recoveryItems = [];
-    return;
-  }
-  startX = e.touches[0].clientX;
-});
-
-canvas.addEventListener('touchmove', (e) => {
-  if (startX !== null) {
-    let moveX = e.touches[0].clientX;
-    let delta = moveX - startX;
-    player.x += delta * 0.4;
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-    startX = moveX;
   }
 });
 
-canvas.addEventListener('touchend', () => {
-  startX = null;
+canvas.addEventListener('touchmove', e => {
+  const touchX = e.touches[0].clientX;
+  if (touchStartX !== null) {
+    const dx = touchX - touchStartX;
+    player.x += dx * 0.3; // ← モーション速度（ここを調整）
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    touchStartX = touchX;
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') {
+    if (!isGameStarted || isGameOver) {
+      isGameStarted = true;
+      isGameOver = false;
+      gameOverImage.style.display = 'none';
+      score = 0;
+      lives = 3;
+      enemies = [];
+      bullets = [];
+      recoveryItems = [];
+    } else {
+      shoot();
+    }
+  }
 });
 
 function gameLoop() {
