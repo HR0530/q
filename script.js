@@ -1,9 +1,7 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 canvas.width = 400;
 canvas.height = 600;
-
-const gameOverImage = document.getElementById("gameOverImage");
 
 const player = { x: canvas.width / 2 - 25, y: canvas.height - 60, width: 50, height: 50 };
 let isGameStarted = false;
@@ -17,8 +15,8 @@ let playerSpeed = 5;
 let lastSpeedUpTime = Date.now();
 let backgroundOffset = 0;
 let invincibleTimer = 0;
-
-let touchStartX = null;
+let shootInterval;
+let startTime = 0;
 
 function drawRect(obj, color) {
   ctx.fillStyle = color;
@@ -51,7 +49,7 @@ function spawnEnemy() {
 }
 
 function spawnRecoveryItem() {
-  if (Math.random() < 0.002) { // 回復出現率を低く
+  if (Math.random() < 0.004) { // 減らした
     recoveryItems.push({
       x: Math.random() * (canvas.width - 20),
       y: -20,
@@ -71,30 +69,44 @@ function shoot() {
   });
 }
 
+function startGame() {
+  isGameStarted = true;
+  isGameOver = false;
+  score = 0;
+  lives = 3;
+  enemies = [];
+  bullets = [];
+  recoveryItems = [];
+  playerSpeed = 5;
+  lastSpeedUpTime = Date.now();
+  startTime = Date.now();
+  shootInterval = setInterval(shoot, 300); // 0.3秒おきに自動発射
+}
+
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   if (!isGameStarted) {
     drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, 'white', 'center');
-    drawText("画面をタップしてスタート", canvas.width / 2, 300, 16, 'gray', 'center');
+    drawText("タップまたはスペースキーでスタート", canvas.width / 2, 300, 16, 'gray', 'center');
     return;
   }
 
   if (isGameOver) {
-    drawText("GAME OVER", canvas.width / 2, 230, 40, 'red', 'center');
-    drawText(`SCORE: ${score}`, canvas.width / 2, 280, 20, 'white', 'center');
-    drawText("タップでリトライ", canvas.width / 2, 330, 18, 'gray', 'center');
-    gameOverImage.style.display = "block";
+    drawText("GAME OVER", canvas.width / 2, 280, 40, 'red', 'center');
+    drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, 'white', 'center');
+    drawText("タップまたはスペースキーでリトライ", canvas.width / 2, 380, 18, 'gray', 'center');
+    drawImageOnGameOver(); // ← ゲームオーバー時の画像表示（CSSで下に配置）
     return;
   }
 
-  // スピードアップ処理
+  // スピードアップ
   if (Date.now() - lastSpeedUpTime > 30000) {
     lastSpeedUpTime = Date.now();
     playerSpeed += 1;
   }
 
-  // 背景スクロール
+  // 背景ライン
   ctx.strokeStyle = '#333';
   for (let i = 0; i < canvas.height / 40; i++) {
     let y = (i * 40 + backgroundOffset) % canvas.height;
@@ -105,14 +117,14 @@ function update() {
   }
   backgroundOffset += 2;
 
-  // 弾処理
+  // 弾
   bullets.forEach(b => b.y -= 5);
   bullets = bullets.filter(b => b.y > 0);
 
-  // 敵処理
+  // 敵
   spawnEnemy();
   enemies.forEach(e => {
-    e.y += 2;
+    e.y += 2 + Math.floor(score / 2000); // スコアごとにスピード変化
     e.x += e.dx;
     if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
   });
@@ -132,14 +144,20 @@ function update() {
     }
   }
 
-  // 敵とプレイヤーの衝突
+  // プレイヤーと敵の当たり判定
   if (invincibleTimer <= 0) {
     for (let e of enemies) {
-      if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
+      if (
+        player.x < e.x + e.width &&
+        player.x + player.width > e.x &&
+        player.y < e.y + e.height &&
+        player.y + player.height > e.y
+      ) {
         lives -= 1;
         invincibleTimer = 60;
         if (lives <= 0) {
           isGameOver = true;
+          clearInterval(shootInterval); // 自動射撃停止
         }
         break;
       }
@@ -148,7 +166,7 @@ function update() {
     invincibleTimer--;
   }
 
-  // 回復処理
+  // 回復アイテム
   spawnRecoveryItem();
   for (let i = recoveryItems.length - 1; i >= 0; i--) {
     const item = recoveryItems[i];
@@ -164,42 +182,71 @@ function update() {
     }
   }
 
+  // 描画
   drawRect(player, 'white');
   bullets.forEach(b => drawRect(b, 'cyan'));
   enemies.forEach(e => drawRect(e, 'red'));
   recoveryItems.forEach(item => drawRect(item, 'green'));
 
-  drawText(`SCORE: ${score}`, 10, 30);
+  const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+  drawText(`SCORE: ${score}  TIME: ${elapsedTime}s`, 10, 30);
   drawLives();
 }
 
-// タップでスタート・リトライ・発射
-canvas.addEventListener("touchstart", (e) => {
+function drawImageOnGameOver() {
+  const img = document.getElementById("gameover-img");
+  img.style.display = "block";
+}
+
+// タップ開始でスタート・リトライ
+canvas.addEventListener('touchstart', () => {
   if (!isGameStarted || isGameOver) {
-    isGameStarted = true;
-    isGameOver = false;
-    score = 0;
-    lives = 3;
-    enemies = [];
-    bullets = [];
-    recoveryItems = [];
-    playerSpeed = 5;
-    gameOverImage.style.display = "none";
-  } else {
-    shoot(); // タップ時に弾発射
+    startGame();
+    const img = document.getElementById("gameover-img");
+    img.style.display = "none"; // 再スタートで画像非表示
   }
-  touchStartX = e.touches[0].clientX;
 });
 
+// マウスでも同じように開始できるように
+canvas.addEventListener('mousedown', () => {
+  if (!isGameStarted || isGameOver) {
+    startGame();
+    const img = document.getElementById("gameover-img");
+    img.style.display = "none";
+  }
+});
+
+// スライド操作
+let lastTouchX = null;
 canvas.addEventListener("touchmove", (e) => {
-  if (touchStartX === null) return;
-  const deltaX = e.touches[0].clientX - touchStartX;
-  player.x += deltaX * 0.5; // モーションを速く
-  if (player.x < 0) player.x = 0;
-  if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-  touchStartX = e.touches[0].clientX;
+  if (e.touches.length === 1) {
+    const touch = e.touches[0];
+    if (lastTouchX !== null) {
+      const dx = touch.clientX - lastTouchX;
+      player.x += dx;
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    }
+    lastTouchX = touch.clientX;
+  }
 });
 
+canvas.addEventListener("touchend", () => {
+  lastTouchX = null;
+});
+
+// キーボードでのリトライ
+document.addEventListener('keydown', e => {
+  if (e.key === ' ') {
+    if (!isGameStarted || isGameOver) {
+      startGame();
+      const img = document.getElementById("gameover-img");
+      img.style.display = "none";
+    }
+  }
+});
+
+// メインループ
 function gameLoop() {
   update();
   requestAnimationFrame(gameLoop);
