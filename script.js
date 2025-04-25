@@ -189,7 +189,7 @@ canvas.addEventListener('touchmove', (e) => {
   if (startX !== null) {
     let moveX = e.touches[0].clientX;
     let delta = moveX - startX;
-    player.x += delta * 0.2;
+    player.x += delta * 0.4;
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
     startX = moveX;
   }
