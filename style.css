@@ -17,11 +17,12 @@ body {
 
 #gameOverImage {
   position: absolute;
-  top: 50%;
+  bottom: 20px;
   left: 50%;
   width: 200px;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   display: none;
   z-index: 10;
   pointer-events: none;
 }
+
