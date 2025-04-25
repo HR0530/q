@@ -11,18 +11,31 @@ body {
 }
 
 #gameCanvas {
-  width: 400px;
-  height: 800px;
-  background-color: #111;
-  border: 2px solid white;
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+  background-color: #000;
+  display: block;
+  border: 4px solid white;
 }
 
 #gameoverImage {
   position: absolute;
-  width: 300px;
   bottom: 100px;
   left: 50%;
   transform: translateX(-50%);
+  width: 300px;
   display: none;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#gameoverText {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: white;
+  font-size: 32px;
+  font-family: Arial, sans-serif;
+  text-align: center;
+  display: none;
+  z-index: 11;
 }
