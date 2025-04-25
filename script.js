@@ -10,13 +10,16 @@ let score = 0;
 let lives = 3;
 let enemies = [];
 let recoveryItems = [];
+let bullets = [];
 let playerSpeed = 10;
+let enemySpeed = 2;
+let enemySpawnRate = 0.02;
 let lastSpeedUpScore = 0;
 let backgroundOffset = 0;
 let invincibleTimer = 0;
 let lastShotTime = 0;
 let startTime = null;
-const gameoverImg = document.getElementById('gameover-img');
+const gameoverImg = document.getElementById('gameoverImage');
 
 function drawRect(obj, color) {
   ctx.fillStyle = color;
@@ -37,7 +40,7 @@ function drawLives() {
 }
 
 function spawnEnemy() {
-  if (Math.random() < 0.02) {
+  if (Math.random() < enemySpawnRate) {
     enemies.push({
       x: Math.random() * (canvas.width - 40),
       y: -40,
@@ -49,7 +52,7 @@ function spawnEnemy() {
 }
 
 function spawnRecoveryItem() {
-  if (Math.random() < 0.003) { // 減らしました
+  if (Math.random() < 0.001) {
     recoveryItems.push({
       x: Math.random() * (canvas.width - 20),
       y: -20,
@@ -62,7 +65,7 @@ function spawnRecoveryItem() {
 
 function shootAuto() {
   const now = Date.now();
-  if (now - lastShotTime > 300) {
+  if (now - lastShotTime > 500) {
     bullets.push({
       x: player.x + player.width / 2 - 2,
       y: player.y,
@@ -72,8 +75,6 @@ function shootAuto() {
     lastShotTime = now;
   }
 }
-
-let bullets = [];
 
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -91,10 +92,8 @@ function update() {
     return;
   }
 
-  // 経過時間
   const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
 
-  // 背景スクロール
   ctx.strokeStyle = '#333';
   for (let i = 0; i < canvas.height / 40; i++) {
     let y = (i * 40 + backgroundOffset) % canvas.height;
@@ -105,36 +104,30 @@ function update() {
   }
   backgroundOffset += 2;
 
-  // スピードアップ
   if (score - lastSpeedUpScore >= 2000) {
     playerSpeed += 1;
+    enemySpeed = Math.min(enemySpeed + 0.5, 10);
+    enemySpawnRate = Math.min(enemySpawnRate + 0.005, 0.08);
     lastSpeedUpScore = score;
   }
 
-  // 弾
-function shootAuto() {
-  const now = Date.now();
-  if (now - lastShotTime > 500) {  // 弾の発射間隔を長く
-    bullets.push({
-      x: player.x + player.width / 2 - 2,
-      y: player.y,
-      width: 4,
-      height: 10
-    });
-    lastShotTime = now;
-  }
-}
+  shootAuto();
 
-  // 敵処理
   spawnEnemy();
+  spawnRecoveryItem();
+
   enemies.forEach(e => {
-    e.y += 2;
+    e.y += enemySpeed;
     e.x += e.dx;
     if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
   });
   enemies = enemies.filter(e => e.y < canvas.height);
 
-  // 弾と敵の当たり判定
+  bullets.forEach(b => {
+    b.y -= 5;
+  });
+  bullets = bullets.filter(b => b.y > 0);
+
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     for (let j = bullets.length - 1; j >= 0; j--) {
@@ -148,7 +141,6 @@ function shootAuto() {
     }
   }
 
-  // 敵とプレイヤーの衝突
   if (invincibleTimer <= 0) {
     for (let e of enemies) {
       if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
@@ -162,20 +154,15 @@ function shootAuto() {
     invincibleTimer--;
   }
 
-  // 回復アイテム処理
-function spawnRecoveryItem() {
-  if (Math.random() < 0.001) { // 出現確率をさらに減少
-    recoveryItems.push({
-      x: Math.random() * (canvas.width - 20),
-      y: -20,
-      width: 20,
-      height: 20,
-      speed: 2
-    });
-  }
-}
+  recoveryItems.forEach(item => {
+    item.y += item.speed;
+    if (player.x < item.x + item.width && player.x + player.width > item.x && player.y < item.y + item.height && player.y + player.height > item.y) {
+      if (lives < 3) lives += 1;
+      item.collected = true;
+    }
+  });
+  recoveryItems = recoveryItems.filter(item => item.y < canvas.height && !item.collected);
 
-  // 描画
   drawRect(player, 'white');
   bullets.forEach(b => drawRect(b, 'cyan'));
   enemies.forEach(e => drawRect(e, 'red'));
@@ -211,7 +198,6 @@ canvas.addEventListener('touchmove', e => {
   }
   lastTouchX = touch.clientX;
 });
-
 canvas.addEventListener('touchend', () => {
   lastTouchX = null;
 });
