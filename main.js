@@ -202,7 +202,7 @@ function drawImageOnGameOver() {
 canvas.addEventListener('touchstart', () => {
   if (!isGameStarted || isGameOver) {
     startGame();
-    const img = document.getElementById("gameover-img");
+    const img = document.getElementById("gameover.img");
     img.style.display = "none"; // 再スタートで画像非表示
   }
 });
@@ -211,7 +211,7 @@ canvas.addEventListener('touchstart', () => {
 canvas.addEventListener('mousedown', () => {
   if (!isGameStarted || isGameOver) {
     startGame();
-    const img = document.getElementById("gameover-img");
+    const img = document.getElementById("gameover.img");
     img.style.display = "none";
   }
 });
@@ -240,7 +240,7 @@ document.addEventListener('keydown', e => {
   if (e.key === ' ') {
     if (!isGameStarted || isGameOver) {
       startGame();
-      const img = document.getElementById("gameover-img");
+      const img = document.getElementById("gameover.img");
       img.style.display = "none";
     }
   }
