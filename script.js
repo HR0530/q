@@ -1,209 +1,209 @@
-const canvas = document.getElementById("gameCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = 400;
-canvas.height = 600;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-const player = { x: canvas.width / 2 - 25, y: canvas.height - 60, width: 50, height: 50 };
+let player = {
+  x: canvas.width / 2 - 15,
+  y: canvas.height - 60,
+  width: 30,
+  height: 30,
+  color: 'white'
+};
+
+let bullets = [];
+let enemies = [];
+let heals = [];
 let score = 0;
 let lives = 3;
-let enemies = [];
-let bullets = [];
-let recoveryItems = [];
-let speedMultiplier = 1;
-let gameStarted = false;
+let startTime = Date.now();
 let gameOver = false;
-let invincibleTimer = 0;
-let lastShotTime = 0;
-let startTime = 0;
-let touchStartX = null;
+let bulletInterval = 0;
 
-const gameOverImg = document.getElementById("gameoverImage");
+const gameoverImage = document.getElementById('gameoverImage');
+const gameoverText = document.getElementById('gameoverText');
+const finalScoreText = document.getElementById('finalScore');
 
-function drawRect(obj, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+function drawPlayer() {
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
 }
 
-function drawText(text, x, y, size = 20, color = "white", align = "left") {
-  ctx.font = `${size}px Arial`;
-  ctx.fillStyle = color;
-  ctx.textAlign = align;
-  ctx.fillText(text, x, y);
+function drawBullets() {
+  ctx.fillStyle = 'white';
+  bullets.forEach(bullet => {
+    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
+  });
+}
+
+function drawEnemies() {
+  ctx.fillStyle = 'red';
+  enemies.forEach(enemy => {
+    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+  });
+}
+
+function drawHeals() {
+  ctx.fillStyle = 'green';
+  heals.forEach(heal => {
+    ctx.fillRect(heal.x, heal.y, heal.width, heal.height);
+  });
+}
+
+function drawScore() {
+  ctx.fillStyle = 'white';
+  ctx.font = '20px Arial';
+  ctx.fillText(`Score: ${score}`, 10, 30);
+
+  const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+  ctx.fillText(`Time: ${elapsedTime}s`, 10, 60);
 }
 
 function drawLives() {
-  for (let i = 0; i < 3; i++) {
-    drawText(i < lives ? "♥" : "♡", canvas.width - 80 + i * 20, 30, 24, "pink", "left");
+  for (let i = 0; i < lives; i++) {
+    ctx.fillStyle = 'pink';
+    ctx.beginPath();
+    ctx.arc(canvas.width - 20 - i * 30, 25, 10, 0, Math.PI * 2);
+    ctx.fill();
   }
+}
+
+function moveBullets() {
+  bullets.forEach(bullet => bullet.y -= 10);
+  bullets = bullets.filter(bullet => bullet.y + bullet.height > 0);
+}
+
+function moveEnemies() {
+  const speed = 2 + Math.floor(score / 2000);
+  enemies.forEach(enemy => enemy.y += speed);
+  enemies = enemies.filter(enemy => enemy.y < canvas.height);
+}
+
+function moveHeals() {
+  heals.forEach(heal => heal.y += 2);
+  heals = heals.filter(heal => heal.y < canvas.height);
+}
+
+function checkCollisions() {
+  bullets.forEach((bullet, bIndex) => {
+    enemies.forEach((enemy, eIndex) => {
+      if (isColliding(bullet, enemy)) {
+        bullets.splice(bIndex, 1);
+        enemies.splice(eIndex, 1);
+        score += 100;
+      }
+    });
+  });
+
+  enemies.forEach((enemy, eIndex) => {
+    if (isColliding(enemy, player)) {
+      enemies.splice(eIndex, 1);
+      lives--;
+      if (lives <= 0) endGame();
+    }
+  });
+
+  heals.forEach((heal, hIndex) => {
+    if (isColliding(heal, player)) {
+      heals.splice(hIndex, 1);
+      lives++;
+    }
+  });
+}
+
+function isColliding(a, b) {
+  return a.x < b.x + b.width &&
+         a.x + a.width > b.x &&
+         a.y < b.y + b.height &&
+         a.y + a.height > b.y;
 }
 
 function spawnEnemy() {
-  if (Math.random() < 0.02) {
-    enemies.push({
-      x: Math.random() * (canvas.width - 40),
-      y: -40,
-      width: 40,
-      height: 40,
-      dx: Math.random() > 0.5 ? 2 : -2
-    });
+  const x = Math.random() * (canvas.width - 30);
+  enemies.push({ x, y: -30, width: 30, height: 30 });
+}
+
+function spawnHeal() {
+  if (Math.random() < 0.003) {
+    const x = Math.random() * (canvas.width - 20);
+    heals.push({ x, y: -20, width: 20, height: 20 });
   }
 }
 
-function spawnRecoveryItem() {
-  if (Math.random() < 0.001) {
-    recoveryItems.push({
-      x: Math.random() * (canvas.width - 20),
-      y: -20,
-      width: 20,
-      height: 20,
-      speed: 2
-    });
-  }
+function shootBullet() {
+  bullets.push({
+    x: player.x + player.width / 2 - 5,
+    y: player.y,
+    width: 10,
+    height: 20
+  });
 }
 
-function shootAuto() {
-  const now = Date.now();
-  if (now - lastShotTime > 500) {
-    bullets.push({
-      x: player.x + player.width / 2 - 2,
-      y: player.y,
-      width: 4,
-      height: 10
-    });
-    lastShotTime = now;
-  }
-}
+let lastEnemyTime = 0;
+function updateGame(timestamp) {
+  if (gameOver) return;
 
-function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (!gameStarted) {
-    drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, "white", "center");
-    drawText("画面をタップしてスタート", canvas.width / 2, 300, 16, "gray", "center");
-    return;
-  }
-
-  if (gameOver) {
-    drawText("GAME OVER", canvas.width / 2, 280, 40, "red", "center");
-    drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, "white", "center");
-    drawText("もう一度タップで再スタート", canvas.width / 2, 380, 18, "gray", "center");
-    gameOverImg.style.display = "block";
-    return;
-  }
-
-  shootAuto();
-
-  // 敵スピード倍率（スコア2000ごと）
-  speedMultiplier = 1 + Math.floor(score / 2000);
-
-  // 弾更新
-  bullets.forEach(b => b.y -= 5);
-  bullets = bullets.filter(b => b.y > 0);
-
-  // 敵生成 & 移動
-  spawnEnemy();
-  enemies.forEach(e => {
-    e.y += 2 * speedMultiplier;
-    e.x += e.dx;
-    if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
-  });
-  enemies = enemies.filter(e => e.y < canvas.height);
-
-  // 弾と敵の当たり判定
-  for (let i = enemies.length - 1; i >= 0; i--) {
-    const e = enemies[i];
-    for (let j = bullets.length - 1; j >= 0; j--) {
-      const b = bullets[j];
-      if (b.x < e.x + e.width && b.x + b.width > e.x && b.y < e.y + e.height && b.y + b.height > e.y) {
-        enemies.splice(i, 1);
-        bullets.splice(j, 1);
-        score += 100;
-        break;
-      }
-    }
-  }
-
-  // プレイヤーと敵の当たり判定
-  if (invincibleTimer <= 0) {
-    for (let e of enemies) {
-      if (player.x < e.x + e.width && player.x + player.width > e.x &&
-          player.y < e.y + e.height && player.y + player.height > e.y) {
-        lives -= 1;
-        invincibleTimer = 60;
-        if (lives <= 0) {
-          gameOver = true;
-        }
-        break;
-      }
-    }
-  } else {
-    invincibleTimer--;
-  }
-
-  // 回復アイテム生成 & 移動
-  spawnRecoveryItem();
-  for (let i = recoveryItems.length - 1; i >= 0; i--) {
-    const item = recoveryItems[i];
-    item.y += item.speed;
-    if (
-      player.x < item.x + item.width &&
-      player.x + player.width > item.x &&
-      player.y < item.y + item.height &&
-      player.y + player.height > item.y
-    ) {
-      if (lives < 3) lives++;
-      recoveryItems.splice(i, 1);
-    }
-  }
-
-  // プレイヤー描画
-  drawRect(player, "white");
-
-  // 弾・敵・回復描画
-  bullets.forEach(b => drawRect(b, "cyan"));
-  enemies.forEach(e => drawRect(e, "red"));
-  recoveryItems.forEach(item => drawRect(item, "green"));
-
-  // スコアとタイム表示
-  drawText(`SCORE: ${score}`, 10, 30);
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  drawText(`TIME: ${elapsed}s`, 10, 60);
+  drawPlayer();
+  drawBullets();
+  drawEnemies();
+  drawHeals();
+  drawScore();
   drawLives();
-}
 
-function resetGame() {
-  score = 0;
-  lives = 3;
-  enemies = [];
-  bullets = [];
-  recoveryItems = [];
-  invincibleTimer = 0;
-  lastShotTime = 0;
-  startTime = Date.now();
-  gameStarted = true;
-  gameOver = false;
-  gameOverImg.style.display = "none";
-}
+  moveBullets();
+  moveEnemies();
+  moveHeals();
+  checkCollisions();
 
-canvas.addEventListener("touchstart", e => {
-  if (!gameStarted || gameOver) {
-    resetGame();
+  if (timestamp - lastEnemyTime > 1000) {
+    spawnEnemy();
+    spawnHeal();
+    lastEnemyTime = timestamp;
   }
-  touchStartX = e.touches[0].clientX;
+
+  bulletInterval++;
+  if (bulletInterval % 15 === 0) {
+    shootBullet();
+  }
+
+  requestAnimationFrame(updateGame);
+}
+
+function endGame() {
+  gameOver = true;
+  gameoverImage.style.display = 'block';
+  gameoverText.style.display = 'block';
+  finalScoreText.textContent = `Final Score: ${score}`;
+}
+
+let touchStartX = null;
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length > 0) {
+    touchStartX = e.touches[0].clientX;
+  }
 });
 
-canvas.addEventListener("touchmove", e => {
+canvas.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0 && touchStartX !== null) {
-    const deltaX = e.touches[0].clientX - touchStartX;
-    player.x += deltaX * 0.2;
+    const dx = e.touches[0].clientX - touchStartX;
+    player.x += dx;
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     touchStartX = e.touches[0].clientX;
   }
 });
 
-function gameLoop() {
-  update();
-  requestAnimationFrame(gameLoop);
-}
-gameLoop();
+let isDragging = false;
+canvas.addEventListener('mousedown', () => { isDragging = true; });
+canvas.addEventListener('mousemove', (e) => {
+  if (isDragging) {
+    const rect = canvas.getBoundingClientRect();
+    player.x = e.clientX - rect.left - player.width / 2;
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+  }
+});
+canvas.addEventListener('mouseup', () => { isDragging = false; });
+
+requestAnimationFrame(updateGame);
