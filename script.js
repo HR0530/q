@@ -1,29 +1,30 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+canvas.width = 400;
+canvas.height = 600;
 
-const player = { x: canvas.width / 2 - 25, y: canvas.height - 100, width: 50, height: 50 };
-let isGameStarted = false;
-let isGameOver = false;
+const player = { x: canvas.width / 2 - 25, y: canvas.height - 60, width: 50, height: 50 };
 let score = 0;
 let lives = 3;
 let enemies = [];
+let bullets = [];
 let recoveryItems = [];
-let playerSpeed = 10;
-let lastSpeedUpScore = 0;
-let backgroundOffset = 0;
+let speedMultiplier = 1;
+let gameStarted = false;
+let gameOver = false;
 let invincibleTimer = 0;
 let lastShotTime = 0;
-let startTime = null;
-const gameoverImg = document.getElementById('gameover-img');
+let startTime = 0;
+let touchStartX = null;
+
+const gameOverImg = document.getElementById("gameoverImage");
 
 function drawRect(obj, color) {
   ctx.fillStyle = color;
   ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
 }
 
-function drawText(text, x, y, size = 20, color = 'white', align = 'left') {
+function drawText(text, x, y, size = 20, color = "white", align = "left") {
   ctx.font = `${size}px Arial`;
   ctx.fillStyle = color;
   ctx.textAlign = align;
@@ -32,7 +33,7 @@ function drawText(text, x, y, size = 20, color = 'white', align = 'left') {
 
 function drawLives() {
   for (let i = 0; i < 3; i++) {
-    drawText(i < lives ? '♥' : '♡', canvas.width - 80 + i * 20, 30, 24, 'pink', 'left');
+    drawText(i < lives ? "♥" : "♡", canvas.width - 80 + i * 20, 30, 24, "pink", "left");
   }
 }
 
@@ -49,7 +50,7 @@ function spawnEnemy() {
 }
 
 function spawnRecoveryItem() {
-  if (Math.random() < 0.003) { // 減らしました
+  if (Math.random() < 0.001) {
     recoveryItems.push({
       x: Math.random() * (canvas.width - 20),
       y: -20,
@@ -62,7 +63,7 @@ function spawnRecoveryItem() {
 
 function shootAuto() {
   const now = Date.now();
-  if (now - lastShotTime > 300) {
+  if (now - lastShotTime > 500) {
     bullets.push({
       x: player.x + player.width / 2 - 2,
       y: player.y,
@@ -73,53 +74,36 @@ function shootAuto() {
   }
 }
 
-let bullets = [];
-
 function update() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (!isGameStarted) {
-    drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, 'white', 'center');
-    drawText("タップでスタート", canvas.width / 2, 300, 16, 'gray', 'center');
+  if (!gameStarted) {
+    drawText("縦スクロールシューティング", canvas.width / 2, 250, 24, "white", "center");
+    drawText("画面をタップしてスタート", canvas.width / 2, 300, 16, "gray", "center");
     return;
   }
 
-  if (isGameOver) {
-    drawText("GAME OVER", canvas.width / 2, 280, 40, 'red', 'center');
-    drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, 'white', 'center');
-    gameoverImg.style.display = 'block';
+  if (gameOver) {
+    drawText("GAME OVER", canvas.width / 2, 280, 40, "red", "center");
+    drawText(`SCORE: ${score}`, canvas.width / 2, 330, 20, "white", "center");
+    drawText("もう一度タップで再スタート", canvas.width / 2, 380, 18, "gray", "center");
+    gameOverImg.style.display = "block";
     return;
   }
 
-  // 経過時間
-  const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-
-  // 背景スクロール
-  ctx.strokeStyle = '#333';
-  for (let i = 0; i < canvas.height / 40; i++) {
-    let y = (i * 40 + backgroundOffset) % canvas.height;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.stroke();
-  }
-  backgroundOffset += 2;
-
-  // スピードアップ
-  if (score - lastSpeedUpScore >= 2000) {
-    playerSpeed += 1;
-    lastSpeedUpScore = score;
-  }
-
-  // 弾
   shootAuto();
+
+  // 敵スピード倍率（スコア2000ごと）
+  speedMultiplier = 1 + Math.floor(score / 2000);
+
+  // 弾更新
   bullets.forEach(b => b.y -= 5);
   bullets = bullets.filter(b => b.y > 0);
 
-  // 敵処理
+  // 敵生成 & 移動
   spawnEnemy();
   enemies.forEach(e => {
-    e.y += 2;
+    e.y += 2 * speedMultiplier;
     e.x += e.dx;
     if (e.x < 0 || e.x > canvas.width - e.width) e.dx *= -1;
   });
@@ -139,13 +123,16 @@ function update() {
     }
   }
 
-  // 敵とプレイヤーの衝突
+  // プレイヤーと敵の当たり判定
   if (invincibleTimer <= 0) {
     for (let e of enemies) {
-      if (player.x < e.x + e.width && player.x + player.width > e.x && player.y < e.y + e.height && player.y + player.height > e.y) {
+      if (player.x < e.x + e.width && player.x + player.width > e.x &&
+          player.y < e.y + e.height && player.y + player.height > e.y) {
         lives -= 1;
         invincibleTimer = 60;
-        if (lives <= 0) isGameOver = true;
+        if (lives <= 0) {
+          gameOver = true;
+        }
         break;
       }
     }
@@ -153,7 +140,7 @@ function update() {
     invincibleTimer--;
   }
 
-  // 回復アイテム処理
+  // 回復アイテム生成 & 移動
   spawnRecoveryItem();
   for (let i = recoveryItems.length - 1; i >= 0; i--) {
     const item = recoveryItems[i];
@@ -169,45 +156,50 @@ function update() {
     }
   }
 
-  // 描画
-  drawRect(player, 'white');
-  bullets.forEach(b => drawRect(b, 'cyan'));
-  enemies.forEach(e => drawRect(e, 'red'));
-  recoveryItems.forEach(item => drawRect(item, 'green'));
+  // プレイヤー描画
+  drawRect(player, "white");
+
+  // 弾・敵・回復描画
+  bullets.forEach(b => drawRect(b, "cyan"));
+  enemies.forEach(e => drawRect(e, "red"));
+  recoveryItems.forEach(item => drawRect(item, "green"));
+
+  // スコアとタイム表示
   drawText(`SCORE: ${score}`, 10, 30);
-  drawText(`TIME: ${elapsedTime}s`, 10, 60);
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  drawText(`TIME: ${elapsed}s`, 10, 60);
   drawLives();
 }
 
-canvas.addEventListener('touchstart', e => {
-  if (!isGameStarted || isGameOver) {
-    isGameStarted = true;
-    isGameOver = false;
-    score = 0;
-    lives = 3;
-    enemies = [];
-    bullets = [];
-    recoveryItems = [];
-    player.x = canvas.width / 2 - 25;
-    gameoverImg.style.display = 'none';
-    startTime = Date.now();
+function resetGame() {
+  score = 0;
+  lives = 3;
+  enemies = [];
+  bullets = [];
+  recoveryItems = [];
+  invincibleTimer = 0;
+  lastShotTime = 0;
+  startTime = Date.now();
+  gameStarted = true;
+  gameOver = false;
+  gameOverImg.style.display = "none";
+}
+
+canvas.addEventListener("touchstart", e => {
+  if (!gameStarted || gameOver) {
+    resetGame();
   }
+  touchStartX = e.touches[0].clientX;
 });
 
-let lastTouchX = null;
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  const touch = e.touches[0];
-  if (lastTouchX !== null) {
-    const dx = touch.clientX - lastTouchX;
-    player.x += dx * 1.5;
-    player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length > 0 && touchStartX !== null) {
+    const deltaX = e.touches[0].clientX - touchStartX;
+    player.x += deltaX * 0.2;
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+    touchStartX = e.touches[0].clientX;
   }
-  lastTouchX = touch.clientX;
-});
-
-canvas.addEventListener('touchend', () => {
-  lastTouchX = null;
 });
 
 function gameLoop() {
