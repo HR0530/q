@@ -186,7 +186,7 @@ canvas.addEventListener('touchstart', (e) => {
 
 canvas.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0 && touchStartX !== null) {
-    const dx = e.touches[0].clientX - touchStartX;
+    const dx = (e.touches[0].clientX - touchStartX) * 1.5;
     player.x += dx;
     if (player.x < 0) player.x = 0;
     if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
