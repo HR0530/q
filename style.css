@@ -1,4 +1,3 @@
-/* 背景を黒く、中央に表示 */
 body {
   margin: 0;
   padding: 0;
@@ -9,30 +8,17 @@ body {
   align-items: center;
 }
 
-/* 中央にゲームをまとめる枠 */
 .game-container {
   position: relative;
 }
 
-/* 白い枠（ゲームフレーム） */
-.game-frame {
-  width: 800px;
-  height: 600px;
-  border: 5px solid white; /* ここが白い枠線 */
-  position: relative;
-  box-sizing: border-box;
-  overflow: hidden; /* 中の要素がはみ出さないようにする */
-}
-
-/* ゲームキャンバス（枠にぴったり） */
 canvas {
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   background-color: #000;
   display: block;
 }
 
-/* ゲームオーバー画像とテキストの位置 */
 #gameoverImage {
   position: absolute;
   bottom: 100px;
