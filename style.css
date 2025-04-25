@@ -1,41 +1,36 @@
+/* ゲーム全体を中央に配置 */
 body {
   margin: 0;
   padding: 0;
-  background-color: black;
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
-  overflow: hidden;
-  position: relative;
+  background-color: black;
 }
 
-#gameCanvas {
+.game-container {
+  position: relative;
+  text-align: center;
+}
+
+canvas {
   background-color: #000;
-  display: block;
-  border: 4px solid white;
 }
 
 #gameoverImage {
   position: absolute;
-  bottom: 100px;
+  bottom: 100px; /* 下から100pxの位置に設定 */
   left: 50%;
   transform: translateX(-50%);
-  width: 300px;
-  display: none;
-  pointer-events: none;
-  z-index: 10;
+  width: 300px; /* 画像のサイズを調整 */
 }
 
 #gameoverText {
   position: absolute;
-  top: 5px;
+  bottom: 20px; /* 画像の下に表示 */
   left: 50%;
   transform: translateX(-50%);
   color: white;
-  font-size: 32px;
-  font-family: Arial, sans-serif;
-  text-align: center;
-  display: none;
-  z-index: 11;
+  font-size: 24px;
 }
