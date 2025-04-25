@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>縦スクロールシューティング</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ゲーム</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <canvas id="gameCanvas" width="480" height="800"></canvas>
-  <div id="gameoverText">GAME OVER<br><span id="finalScore"></span></div>
-  <img id="gameoverImage" src="gameover.jpg" alt="Game Over" />
+  <div class="game-container">
+    <canvas id="gameCanvas"></canvas>
+    <img id="gameoverImage" src="gameover.jpg" alt="Game Over" style="display:none;">
+    <div id="gameoverText" style="display:none;">
+      <p id="finalScore"></p>
+      <p>Game Over</p>
+    </div>
+  </div>
   <script src="script.js"></script>
 </body>
 </html>
